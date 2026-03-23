@@ -1,0 +1,104 @@
+# Рыбалко Тимофей Нбибд01-24 23.03.26  21.14
+# A16 BFS на взвешенном графе: а почему не работает?
+
+
+from collections import deque
+
+# Дан взвешенный граф
+graph = {
+    0: [(1, 10), (2, 1)],
+    1: [(3, 1)],
+    2: [(1, 1), (3, 10)],
+    3: []
+}
+
+# BFS - ищет путь с минимальным количеством ребер,слоями (веса игнорирует)
+def bfs(start, end):
+    q = deque([(start, [start])])      # очередь: (вершина, путь)
+    visited = set()                     # посещенные вершины
+    
+    while q:
+        v, path = q.popleft()
+        
+        if v == end:
+            return path
+        
+        if v not in visited:
+            visited.add(v)
+            for u, _ in graph[v]:      #вес игнорируем
+                if u not in visited:
+                    q.append((u, path + [u]))
+    
+    return None
+
+# Находим все пути от start до end
+def all_paths(start, end, path=None):
+    if path is None:
+        path = [start]
+    
+    if start == end:
+        return [path]
+    
+    res = []
+    for v, _ in graph[start]:
+        if v not in path:               # чтобы не было циклов(бесконеч)
+            new = all_paths(v, end, path + [v])
+            res.extend(new)
+    
+    return res
+
+# Считаем вес пути
+def get_weight(path):
+    w = 0
+    for i in range(len(path) - 1):
+        for v, weight in graph[path[i]]:
+            if v == path[i + 1]:
+                w += weight
+                break
+    return w
+
+
+#ВЫПОЛНЕНИЕ()()
+
+# 1. BFS
+bfs_path = bfs(0, 3)
+print("BFS нашел путь:", " -> ".join(map(str, bfs_path)))
+print("Вес пути:", get_weight(bfs_path))
+print()
+
+# 2. Все пути
+paths = all_paths(0, 3)
+print("Все возможные пути:")
+for p in paths:
+    print("  ", " -> ".join(map(str, p)), "вес =", get_weight(p))
+
+# 3. Кратчайший по весу
+best = min(paths, key=get_weight)
+print("\nКратчайший по весу:", " -> ".join(map(str, best)))
+print("Вес:", get_weight(best))
+print()
+
+#ответы
+
+print("=" * 50)
+print("ОТВЕТЫ НА ВОПРОСЫ")
+print("=" * 50)
+
+print("1. Какой путь нашёл BFS? Какой путь минимален по весу? Совпадают ли они?")
+print("   BFS нашёл путь: 0 → 1 → 3. Кратчайший по весу: 0 → 2 → 1 → 3.")
+print("   Пути НЕ совпадают, потому что BFS минимизирует количество рёбер (2 ребра),")
+print("   а не сумму весов. Путь 0→2→1→3 имеет 3 ребра, но его вес (3) меньше,")
+print("   чем у пути 0→1→3 (11).")
+print()
+
+print("2. Почему BFS неверно работает на взвешенных графах?")
+print("   BFS ищет путь с минимальным КОЛИЧЕСТВОМ РЁБЕР, а не с минимальной СУММОЙ ВЕСОВ.")
+print("   Для BFS все рёбра одинаковые, он не видит разницы между ребром весом 1 и ребром весом 100.")
+print("   В результате BFS может выбрать путь с меньшим числом шагов, но большим суммарным весом.")
+print()
+
+print("3. В каком случае BFS всё же даёт правильный ответ для кратчайшего пути?")
+print("   BFS работает корректно для НЕВЗВЕШЕННЫХ ГРАФОВ (где веса отсутствуют или все равны).")
+print("   Если все рёбра имеют одинаковый вес (например, 1), то минимальное количество рёбер")
+print("   автоматически означает минимальную сумму весов. В этом случае BFS находит")
+print("   кратчайший путь.")
