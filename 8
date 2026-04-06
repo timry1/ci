@@ -1,0 +1,149 @@
+# Рыбалко Тимофей Нбибд01-24 05.04.26  21.59
+# Задача А9 Сравнение поведения компилируемого (C) и интерпретируемого (Python)языка на деле
+# ВЫВОД ВСЕХ РЕЗУЛЬТАТОВ ПО ЗАДАНИЮ (Python)
+
+print("=" * 60)
+print("СРАВНЕНИЕ C И PYTHON")
+print("=" * 60)
+
+# ЧАСТЬ 1: СИНТАКСИЧЕСКИЕ ОШИБКИ
+print("\nЧАСТЬ 1: СИНТАКСИЧЕСКАЯ ОШИБКА")
+print("-" * 40)
+
+# 1А. PYTHON с ошибкой (пропущено двоеточие)
+print("\n1. PYTHON (код с ошибкой - пропущено двоеточие):")
+print("-" * 40)
+print("""
+def sum_array(arr):
+    total = 0
+    for x in arr   # ОШИБКА: пропущено двоеточие
+        total += x
+    return total
+
+print(sum_array([1, 2, 3, 4, 5]))
+""")
+print("ВЫВОД:")
+print("""
+  File "main.py", line 3
+    for x in arr
+               ^
+SyntaxError: expected ':'
+""")  # Python ловит ошибку до выполнения, показывает стрелкой на место
+
+# 1Б. C с ошибкой (пропущена точка с запятой)
+print("\n2. C (код с ошибкой - пропущена точка с запятой):")
+print("-" * 40)
+print("""
+#include <stdio.h>
+
+int sum_array(int arr[], int n) {
+    int sum = 0;
+    for(int i = 0; i < n; i++) {
+        sum += arr[i];
+    }
+    return sum   // ОШИБКА: пропущена ;
+}
+
+int main() {
+    int numbers[] = {1, 2, 3, 4, 5};
+    int result = sum_array(numbers, 5);
+    printf("Sum: %d\\n", result);
+    return 0;
+}
+""")
+print("ВЫВОД:")
+print("""
+/home/compile/online-compile-C.c: In function 'sum_array':
+/home/compile/online-compile-C.c:8:15: error: expected ';' before '}' token
+    8 |     return sum
+      |               ^
+      |               ;
+    9 | }
+      | ~
+""")  # Компилятор C не создаст программу, пока ошибка не исправлена
+
+# ЧАСТЬ 2: ДЕЛЕНИЕ НА НОЛЬ
+print("\n" + "=" * 60)
+print("ЧАСТЬ 2: ДЕЛЕНИЕ НА НОЛЬ")
+print("=" * 40)
+
+# 2А. PYTHON деление на ноль
+print("\n1. PYTHON:")
+print("-" * 40)
+print("""
+def divide(a, b):
+    return a / b
+
+print(divide(10, 2))
+print(divide(10, 0))
+""")
+print("ВЫВОД:")
+print("""
+5.0
+Traceback (most recent call last):
+  File "main.py", line 5, in <module>
+    print(divide(10, 0))
+  File "main.py", line 2, in divide
+    return a / b
+ZeroDivisionError: division by zero
+""")  # Python выбрасывает исключение, которое можно перехватить
+
+# 2Б. C деление на ноль
+print("\n2. C:")
+print("-" * 40)
+print("""
+#include <stdio.h>
+
+float divide(int a, int b) {
+    return (float)a / b;
+}
+
+int main() {
+    printf("divide(10, 2) = %f\\n", divide(10, 2));
+    printf("divide(10, 0) = %f\\n", divide(10, 0));
+    return 0;
+}
+""")
+print("ВЫВОД:")
+print("""
+divide(10, 2) = 5.000000
+divide(10, 0) = inf
+""")  # C даёт inf (бесконечность) - это Undefined Behavior
+
+# ИТОГОВАЯ ТАБЛИЦА
+print("\n" + "=" * 60)
+print("ИТОГОВАЯ ТАБЛИЦА НАБЛЮДЕНИЙ")
+print("=" * 60)
+
+print("""
++----------+----------------------------+-----------------------------+
+|  Язык    |   Синтаксическая ошибка     |   Деление на ноль           |
++----------+----------------------------+-----------------------------+
+|    C     | при компиляции (gcc)        | inf (Undefined Behavior)    |
+|          | error: expected ';'         | или Floating point exception|
++----------+----------------------------+-----------------------------+
+|  Python  | при запуске (SyntaxError)   | ZeroDivisionError           |
+|          | expected ':'                |                             |
++----------+----------------------------+-----------------------------+
+""")
+
+# КЛЮЧЕВОЙ ВЫВОД
+print("\n" + "=" * 60)
+print("КЛЮЧЕВОЙ ВЫВОД")
+print("=" * 60)
+
+print("""
+1. C проверяет синтаксис ДО ЗАПУСКА (на этапе компиляции).
+   Если есть ошибка -> программа даже не создаётся.
+
+2. Python проверяет синтаксис В МОМЕНТ ЗАПУСКА.
+   Интерпретатор читает файл построчно.
+
+3. При делении на ноль:
+   - Python -> ZeroDivisionError (исключение, можно перехватить)
+   - C -> неопределённое поведение (inf, SIGFPE, nan)
+   
+   C не проверяет деление на ноль -> ответственность программиста.
+""")
+
+print("\nЗАВЕРШЕНО")
