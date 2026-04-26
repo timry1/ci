@@ -1,0 +1,189 @@
+//Рыбалко Тимофей Нбибд01-24 26.04.26  23.03
+//B15: Реализация паттерна «Активный объект» (Active Object) на C++ и Java.
+import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
+
+//future (заглушка для результата)
+
+class Future<T> {
+    private T result;
+    private boolean ready = false;
+    
+    // установка результата (вызывается из рабочего потока)
+    public synchronized void setResult(T value) {
+        result = value;
+        ready = true;
+        notifyAll();  // пробуждаем всех, кто ждёт в get()
+    }
+    
+    // получение результата (блокируется, если ещё не готов)
+    public synchronized T get() {
+        while (!ready) {
+            try {
+                wait();  // ждём, пока результат не появится
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+        return result;
+    }
+}
+
+//активный объект
+
+class AsyncCalculator {
+    // интерфейс задачи
+    private interface Task {
+        void execute();
+    }
+    
+    // реализация задачи с конкретным типом результата
+    private static class TaskImpl<T> implements Task {
+        private final Supplier<T> func;      // функция, которую нужно выполнить
+        private final Future<T> future;      // куда положить результат
+        
+        TaskImpl(Supplier<T> func, Future<T> future) {
+            this.func = func;
+            this.future = future;
+        }
+        
+        @Override
+        public void execute() {
+            T result = func.get();
+            future.setResult(result);
+        }
+    }
+    
+    // очередь задач (fifo)
+    private final Queue<Task> taskQueue = new LinkedList<>();
+    
+    // рабочий поток
+    private final Thread workerThread;
+    
+    // флаг работы
+    private final AtomicBoolean running = new AtomicBoolean(true);
+    
+    public AsyncCalculator() {
+        workerThread = new Thread(this::processTasks);
+        workerThread.start();
+    }
+    
+    // отправка задачи на сложение
+    public Future<Integer> submitAdd(int a, int b) {
+        Future<Integer> future = new Future<>();
+        Task task = new TaskImpl<>(() -> a + b, future);
+        addTask(task);
+        return future;
+    }
+    
+    // отправка задачи на умножение
+    public Future<Integer> submitMultiply(int a, int b) {
+        Future<Integer> future = new Future<>();
+        Task task = new TaskImpl<>(() -> a * b, future);
+        addTask(task);
+        return future;
+    }
+    
+    // отправка задачи на вычисление числа фибоначчи
+    public Future<Long> submitFibonacci(int n) {
+        Future<Long> future = new Future<>();
+        Task task = new TaskImpl<>(() -> {
+            if (n <= 0) return 0L;
+            if (n == 1) return 1L;
+            long a = 0, b = 1;
+            for (int i = 2; i <= n; i++) {
+                long next = a + b;
+                a = b;
+                b = next;
+            }
+            return b;
+        }, future);
+        addTask(task);
+        return future;
+    }
+    
+    // остановка рабочего потока
+    public void shutdown() {
+        running.set(false);
+        workerThread.interrupt();
+        try {
+            workerThread.join();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+    
+    // добавление задачи в очередь
+    private void addTask(Task task) {
+        synchronized (taskQueue) {
+            taskQueue.add(task);
+            taskQueue.notify();  // пробуждаем рабочий поток
+        }
+    }
+    
+    // рабочий поток: извлекает задачи и выполняет их
+    private void processTasks() {
+        while (running.get()) {
+            Task task = null;
+            synchronized (taskQueue) {
+                while (taskQueue.isEmpty() && running.get()) {
+                    try {
+                        taskQueue.wait();  // ждём новую задачу
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
+                }
+                if (!taskQueue.isEmpty()) {
+                    task = taskQueue.poll();
+                }
+            }
+            if (task != null) {
+                task.execute();  // выполняем задачу
+            }
+        }
+    }
+    
+    //точка входа
+    
+    public static void main(String[] args) {
+        AsyncCalculator calc = new AsyncCalculator();
+        
+        System.out.println("submit: add(3,4), multiply(5,6), fib(10), add(100,200), multiply(7,8)");
+        System.out.println("все запросы приняты мгновенно (неблокирующие)\n");
+        
+        // отправляем запросы без ожидания
+        Future<Integer> future1 = calc.submitAdd(3, 4);
+        Future<Integer> future2 = calc.submitMultiply(5, 6);
+        Future<Long> future3 = calc.submitFibonacci(10);
+        Future<Integer> future4 = calc.submitAdd(100, 200);
+        Future<Integer> future5 = calc.submitMultiply(7, 8);
+        
+        // получаем результаты (блокирующий get)
+        System.out.println("future1.get() -> " + future1.get() + " (возможно, уже готово)");
+        System.out.println("future2.get() -> " + future2.get());
+        System.out.println("future3.get() -> " + future3.get());
+        System.out.println("future4.get() -> " + future4.get());
+        System.out.println("future5.get() -> " + future5.get());
+        
+        calc.shutdown();
+        
+        System.out.println("\nq31. чем future/promise отличается от синхронного вызова?");
+        System.out.println("ответ:");
+        System.out.println("  синхронный вызов блокирует поток до завершения операции.");
+        System.out.println("  future/promise возвращает заглушку (future) сразу,");
+        System.out.println("  а реальный результат получается позже через get().");
+        System.out.println("  это позволяет не ждать результат сразу и заниматься другой работой.");
+        
+        System.out.println("\nq32. как active object сочетает ооп с асинхронностью?");
+        System.out.println("ответ:");
+        System.out.println("  active object инкапсулирует внутри себя:");
+        System.out.println("    - очередь задач (fifo)");
+        System.out.println("    - рабочий поток");
+        System.out.println("    - механизм future для получения результатов");
+        System.out.println("  клиент вызывает методы как обычный ооп-интерфейс,");
+        System.out.println("  но выполнение происходит асинхронно в отдельном потоке.");
+        System.out.println("  это скрывает сложность многопоточности за простым api.");
+    }
+}
