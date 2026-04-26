@@ -1,0 +1,144 @@
+# Рыбалко Тимофей Нбибд01-24 26.04.26  20.48
+# Реализация класса MathHelper со статическими методами на C++ и Java
+#include <iostream>
+#include <cmath>
+#include <iomanip>
+
+class MathHelper {
+public:
+    // статические константы
+    static constexpr double PI = 3.14159265358979323846;
+    static constexpr double E = 2.71828182845904523536;
+    static constexpr double GOLDEN_RATIO = 1.61803398874989484820;
+    
+    // isPrime - проверка, является ли число простым
+    static bool isPrime(int n) {
+        if (n <= 1) return false;
+        if (n <= 3) return true;
+        if (n % 2 == 0 || n % 3 == 0) return false;
+        
+        for (int i = 5; i * i <= n; i += 6) {
+            if (n % i == 0 || n % (i + 2) == 0)
+                return false;
+        }
+        return true;
+    }
+    
+    // gcd - наибольший общий делитель (алгоритм Евклида)
+    static int gcd(int a, int b) {
+        while (b != 0) {
+            int temp = b;
+            b = a % b;
+            a = temp;
+        }
+        return a;
+    }
+    
+    // lcm - наименьшее общее кратное
+    static int lcm(int a, int b) {
+        return a / gcd(a, b) * b;
+    }
+    
+    // power - возведение в степень
+    static double power(double base, int exp) {
+        double result = 1.0;
+        for (int i = 0; i < exp; ++i) {
+            result *= base;
+        }
+        return result;
+    }
+    
+    // fibonacci - n-е число Фибоначчи (итеративно)
+    static long long fibonacci(int n) {
+        if (n <= 0) return 0;
+        if (n == 1) return 1;
+        
+        long long a = 0, b = 1;
+        for (int i = 2; i <= n; ++i) {
+            long long next = a + b;
+            a = b;
+            b = next;
+        }
+        return b;
+    }
+    
+    // factorial - факториал числа
+    static long long factorial(long n) {
+        if (n < 0) return -1;
+        long long result = 1;
+        for (long i = 2; i <= n; ++i) {
+            result *= i;
+        }
+        return result;
+    }
+};
+
+int main() {
+    std::cout << "задача: класс MathHelper со статическими методами\n\n";
+    
+    std::cout << "1. результаты работы методов\n\n";
+    
+    std::cout << "isPrime(17) = " << (MathHelper::isPrime(17) ? "true" : "false")
+              << ", isPrime(20) = " << (MathHelper::isPrime(20) ? "true" : "false") << "\n";
+    
+    std::cout << "gcd(48, 18) = " << MathHelper::gcd(48, 18)
+              << ", lcm(4, 6) = " << MathHelper::lcm(4, 6) << "\n";
+    
+    std::cout << std::fixed << std::setprecision(1);
+    std::cout << "power(2.0, 10) = " << MathHelper::power(2.0, 10) << "\n";
+    std::cout << std::defaultfloat;
+    
+    std::cout << "fibonacci(10) = " << MathHelper::fibonacci(10) << "\n";
+    
+    std::cout << "factorial(12) = " << MathHelper::factorial(12) << "\n\n";
+    
+    std::cout << "2. статические константы\n\n";
+    
+    std::cout << std::fixed << std::setprecision(15);
+    std::cout << "MathHelper::PI = " << MathHelper::PI << "\n";
+    std::cout << "MathHelper::E = " << MathHelper::E << "\n";
+    std::cout << "MathHelper::GOLDEN_RATIO = " << MathHelper::GOLDEN_RATIO << "\n\n";
+    std::cout << std::defaultfloat;
+    
+    std::cout << "3. ответы на вопросы\n\n";
+    
+    std::cout << "q50. когда следует делать методы статическими?\n\n";
+    std::cout << "ответ:\n";
+    std::cout << "  статические методы следует использовать, когда:\n";
+    std::cout << "  1) метод не зависит от состояния объекта\n";
+    std::cout << "     (работает только с переданными параметрами)\n";
+    std::cout << "  2) метод является утилитарным (математика, конвертация, проверки)\n";
+    std::cout << "  3) метод не нуждается в доступе к нестатическим полям экземпляра\n";
+    std::cout << "  4) метод логически относится к классу в целом, а не к конкретному объекту\n\n";
+    
+    std::cout << "  примеры: математические функции (sin, cos, sqrt),\n";
+    std::cout << "  конвертация типов, фабричные методы\n\n";
+    
+    std::cout << "q51. можно ли обращаться к нестатическим полям из статического метода? почему?\n\n";
+    std::cout << "ответ:\n";
+    std::cout << "  нет, нельзя.\n\n";
+    std::cout << "  причина: статический метод вызывается БЕЗ создания объекта класса.\n";
+    std::cout << "  нестатические поля принадлежат конкретному экземпляру объекта.\n";
+    std::cout << "  у статического метода нет доступа к 'this' (ссылке на текущий объект),\n";
+    std::cout << "  поэтому он не знает, у какого именно объекта брать значение нестатического поля.\n\n";
+    std::cout << "  исключение: статический метод может обратиться к нестатическому полю,\n";
+    std::cout << "  если ему ПЕРЕДАТЬ объект явно в качестве параметра.\n\n";
+    
+    std::cout << "4. ключевые особенности статических методов\n\n";
+    
+    std::cout << "в c++ и java статические методы:\n";
+    std::cout << "  - вызываются через ClassName::method() (c++) или ClassName.method() (java)\n";
+    std::cout << "  - не требуют создания объекта\n";
+    std::cout << "  - не имеют доступа к нестатическим полям и методам\n";
+    std::cout << "  - могут обращаться только к другим статическим членам\n\n";
+    
+    std::cout << "вызов всех методов производится БЕЗ создания объекта:\n";
+    std::cout << "  MathHelper::isPrime(17)\n";
+    std::cout << "  MathHelper::gcd(48, 18)\n";
+    std::cout << "  MathHelper::power(2.0, 10)\n";
+    std::cout << "  и т.д.\n\n";
+    
+    std::cout << "вывод: статические методы — это утилиты, не зависящие от состояния объекта.\n";
+    
+    return 0;
+}
