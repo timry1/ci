@@ -1,0 +1,133 @@
+// Рыбалко Тимофей Нбибд01-24 26.04.2026 22.07
+// Реализация класса MathHelper со статическими методами на C++ и Java
+public class Main {
+    // статические константы
+    public static final double PI = 3.14159265358979323846;
+    public static final double E = 2.71828182845904523536;
+    public static final double GOLDEN_RATIO = 1.61803398874989484820;
+    
+    // isPrime - проверка, является ли число простым
+    public static boolean isPrime(int n) {
+        if (n <= 1) return false;
+        if (n <= 3) return true;
+        if (n % 2 == 0 || n % 3 == 0) return false;
+        
+        for (int i = 5; i * i <= n; i += 6) {
+            if (n % i == 0 || n % (i + 2) == 0)
+                return false;
+        }
+        return true;
+    }
+    
+    // gcd - наибольший общий делитель
+    public static int gcd(int a, int b) {
+        while (b != 0) {
+            int temp = b;
+            b = a % b;
+            a = temp;
+        }
+        return a;
+    }
+    
+    // lcm - наименьшее общее кратное
+    public static int lcm(int a, int b) {
+        return a / gcd(a, b) * b;
+    }
+    
+    // power - возведение в степень
+    public static double power(double base, int exp) {
+        double result = 1.0;
+        for (int i = 0; i < exp; i++) {
+            result *= base;
+        }
+        return result;
+    }
+    
+    // fibonacci - n-е число фибоначчи
+    public static long fibonacci(int n) {
+        if (n <= 0) return 0;
+        if (n == 1) return 1;
+        
+        long a = 0, b = 1;
+        for (int i = 2; i <= n; i++) {
+            long next = a + b;
+            a = b;
+            b = next;
+        }
+        return b;
+    }
+    
+    // factorial - факториал
+    public static long factorial(long n) {
+        if (n < 0) return -1;
+        long result = 1;
+        for (long i = 2; i <= n; i++) {
+            result *= i;
+        }
+        return result;
+    }
+    
+    public static void main(String[] args) {
+        System.out.println("задача: класс Main со статическими методами\n");
+        
+        System.out.println("1. результаты работы методов\n");
+        
+        System.out.println("isPrime(17) = " + Main.isPrime(17) 
+                         + ", isPrime(20) = " + Main.isPrime(20));
+        
+        System.out.println("gcd(48, 18) = " + Main.gcd(48, 18)
+                         + ", lcm(4, 6) = " + Main.lcm(4, 6));
+        
+        System.out.printf("power(2.0, 10) = %.1f\n", Main.power(2.0, 10));
+        
+        System.out.println("fibonacci(10) = " + Main.fibonacci(10));
+        
+        System.out.println("factorial(12) = " + Main.factorial(12) + "\n");
+        
+        System.out.println("2. статические константы\n");
+        
+        System.out.printf("Main.PI = %.15f\n", Main.PI);
+        System.out.printf("Main.E = %.15f\n", Main.E);
+        System.out.printf("Main.GOLDEN_RATIO = %.15f\n\n", Main.GOLDEN_RATIO);
+        
+        System.out.println("3. ответы на вопросы\n");
+        
+        System.out.println("q50. когда следует делать методы статическими?\n");
+        System.out.println("ответ:");
+        System.out.println("  статические методы следует использовать, когда:");
+        System.out.println("  1) метод не зависит от состояния объекта");
+        System.out.println("     (работает только с переданными параметрами)");
+        System.out.println("  2) метод является утилитарным (математика, конвертация, проверки)");
+        System.out.println("  3) метод не нуждается в доступе к нестатическим полям экземпляра");
+        System.out.println("  4) метод логически относится к классу в целом, а не к конкретному объекту\n");
+        
+        System.out.println("  примеры: математические функции (sin, cos, sqrt),");
+        System.out.println("  конвертация типов, фабричные методы\n");
+        
+        System.out.println("q51. можно ли обращаться к нестатическим полям из статического метода? почему?\n");
+        System.out.println("ответ:");
+        System.out.println("  нет, нельзя.\n");
+        System.out.println("  причина: статический метод вызывается БЕЗ создания объекта класса.");
+        System.out.println("  нестатические поля принадлежат конкретному экземпляру объекта.");
+        System.out.println("  у статического метода нет доступа к 'this' (ссылке на текущий объект),");
+        System.out.println("  поэтому он не знает, у какого именно объекта брать значение нестатического поля.\n");
+        System.out.println("  исключение: статический метод может обратиться к нестатическому полю,");
+        System.out.println("  если ему ПЕРЕДАТЬ объект явно в качестве параметра.\n");
+        
+        System.out.println("4. ключевые особенности статических методов\n");
+        
+        System.out.println("в java статические методы:");
+        System.out.println("  - вызываются через ClassName.method()");
+        System.out.println("  - не требуют создания объекта");
+        System.out.println("  - не имеют доступа к нестатическим полям и методам");
+        System.out.println("  - могут обращаться только к другим статическим членам\n");
+        
+        System.out.println("вызов всех методов производится БЕЗ создания объекта:");
+        System.out.println("  Main.isPrime(17)");
+        System.out.println("  Main.gcd(48, 18)");
+        System.out.println("  Main.power(2.0, 10)");
+        System.out.println("  и т.д.\n");
+        
+        System.out.println("вывод: статические методы — это утилиты, не зависящие от состояния объекта.");
+    }
+}
