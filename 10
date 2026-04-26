@@ -1,0 +1,229 @@
+from collections import deque
+
+#bst из b14: двоичное дерево поиска 
+
+def bst_insert(root, val):
+    """вставка значения в bst"""
+    if root is None:
+        return {'val': val, 'left': None, 'right': None}
+    
+    if val < root['val']:
+        root['left'] = bst_insert(root['left'], val)
+    elif val > root['val']:
+        root['right'] = bst_insert(root['right'], val)
+    
+    return root
+
+def bst_search(root, val):
+    """поиск значения в bst"""
+    if root is None:
+        return False
+    if val == root['val']:
+        return True
+    elif val < root['val']:
+        return bst_search(root['left'], val)
+    else:
+        return bst_search(root['right'], val)
+
+def bst_inorder(root):
+    """симметричный обход (l-node-r)"""
+    if root is None:
+        return []
+    return bst_inorder(root['left']) + [root['val']] + bst_inorder(root['right'])
+
+def bst_height(root):
+    """высота дерева"""
+    if root is None:
+        return 0
+    return 1 + max(bst_height(root['left']), bst_height(root['right']))
+
+def bst_count(root):
+    """количество узлов"""
+    if root is None:
+        return 0
+    return 1 + bst_count(root['left']) + bst_count(root['right'])
+
+
+#b16: обходы дерева
+
+def bst_preorder(root):
+    """
+    прямой обход (node-l-r)
+    доказательство корректности:
+    - базовый случай: пустое дерево → [] ✓
+    - шаг: рекурсивно обходим левое и правое поддеревья
+    - инвариант: сначала корень, потом всё левое, потом всё правое
+    """
+    if root is None:
+        return []
+    return [root['val']] + bst_preorder(root['left']) + bst_preorder(root['right'])
+
+def bst_inorder_traversal(root):
+    """
+    симметричный обход (l-node-r)
+    доказательство корректности:
+    - для bst возвращает отсортированный список
+    - по свойству bst: левое < корень < правое
+    - по индукции: левое отсортировано, правое отсортировано
+    - конкатенация сохраняет порядок сортировки
+    """
+    if root is None:
+        return []
+    return bst_inorder_traversal(root['left']) + [root['val']] + bst_inorder_traversal(root['right'])
+
+def bst_postorder(root):
+    """
+    обратный обход (l-r-node)
+    доказательство корректности:
+    - базовый случай: пустое дерево → [] ✓
+    - шаг: сначала левое, потом правое, потом корень
+    - инвариант: все потомки обрабатываются раньше родителя
+    """
+    if root is None:
+        return []
+    return bst_postorder(root['left']) + bst_postorder(root['right']) + [root['val']]
+
+def bst_levelorder(root):
+    """
+    обход по уровням (bfs через deque)
+    доказательство корректности:
+    - используем fifo-очередь: сначала обрабатываем корень
+    - при обработке узла добавляем его детей в конец очереди
+    - инвариант: все узлы уровня d обрабатываются раньше уровня d+1
+    - deque даёт o(1) на popleft(), list.pop(0) был бы o(n)
+    """
+    if root is None:
+        return []
+    
+    result = []
+    queue = deque([root])
+    
+    while queue:
+        node = queue.popleft()
+        result.append(node['val'])
+        
+        if node['left']:
+            queue.append(node['left'])
+        if node['right']:
+            queue.append(node['right'])
+    
+    return result
+
+#сериализация
+
+def serialize(root):
+    """
+    сериализация дерева через pre-order обход
+    pre-order выбран потому что:
+    - восстановить дерево можно за один проход
+    - структура сохраняется (корень, потом левое, потом правое)
+    """
+    if root is None:
+        return ['#']
+    
+    return [str(root['val'])] + serialize(root['left']) + serialize(root['right'])
+
+def deserialize(data):
+    """десериализация дерева из pre-order списка"""
+    def helper():
+        val = next(values_iter)
+        if val == '#':
+            return None
+        
+        node = {'val': int(val), 'left': None, 'right': None}
+        node['left'] = helper()
+        node['right'] = helper()
+        return node
+    
+    values_iter = iter(data)
+    return helper()
+
+#тестирование
+
+# строим дерево из примера
+values = [5, 3, 7, 1, 4, 6, 8, 2]
+root = None
+for v in values:
+    root = bst_insert(root, v)
+
+print("=" * 60)
+print("задача b16. обходы двоичного дерева поиска (bst)")
+print("дерево из списка: [5, 3, 7, 1, 4, 6, 8, 2]")
+print("=" * 60)
+
+# все четыре обхода
+print("\n" + "-" * 60)
+print("1. четыре основных обхода")
+print("-" * 60)
+
+pre = bst_preorder(root)
+ino = bst_inorder_traversal(root)
+post = bst_postorder(root)
+level = bst_levelorder(root)
+
+print(f"pre-order:   {pre}")
+print(f"in-order:    {ino}")
+print(f"post-order:  {post}")
+print(f"level-order: {level}")
+
+# применение обходов
+print("\n" + "-" * 60)
+print("2. применение обходов")
+print("-" * 60)
+
+print("""
+какой обход используется для:
+• сериализации:        pre-order (нужен для восстановления структуры)
+• вычисления выражений: post-order (операнды перед операторами)
+• удаления дерева:     post-order (сначала дети, потом родитель)
+""")
+
+# сериализация и десериализация
+print("-" * 60)
+print("3. сериализация и десериализация")
+print("-" * 60)
+
+serialized = serialize(root)
+print(f"serialized (pre-order с маркерами '#'):")
+print(f"  {serialized}")
+
+new_root = deserialize(serialized)
+new_pre = bst_preorder(new_root)
+print(f"\nдесериализовано (pre-order): {new_pre}")
+print(f"совпадает с оригиналом: {pre == new_pre}")
+
+print("\n" + "-" * 60)
+print("4. ответы на вопросы")
+print("-" * 60)
+
+print("""
+q62. почему post-order удобен для удаления дерева?
+ответ: 
+  post-order обходит детей раньше родителя (l-r-node).
+  при удалении дерева нужно сначала удалить всех потомков,
+  и только потом сам узел. post-order даёт этот порядок
+  автоматически без дополнительной логики.
+
+q63. level-order требует очереди, а не стека — почему?
+ответ:
+  level-order (bfs) обрабатывает узлы по уровням.
+  очередь (fifo) гарантирует, что узлы обрабатываются
+  в порядке их обнаружения: сначала все с уровня d,
+  потом все с уровня d+1. стек (lifo) даст глубинный
+  обход (dfs), где один путь исследуется до конца.
+""")
+
+print("\n" + "=" * 60)
+print("выводы")
+print("=" * 60)
+
+print("""
+• pre-order:   корень → левое → правое (для сериализации)
+• in-order:    левое → корень → правое (даёт отсортированный список)
+• post-order:  левое → правое → корень (для удаления, вычислений)
+• level-order: bfs через очередь (обход по уровням)
+
+сериализация через pre-order работает, потому что:
+  - маркер '#' обозначает пустые узлы
+  - при десериализации восстанавливается структура 1-в-1
+""")
