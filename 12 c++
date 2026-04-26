@@ -1,0 +1,218 @@
+//Рыбалко Тимофей Нбибд01-24 26.04.26  23.03
+//B15: Реализация паттерна «Активный объект» (Active Object) на C++ и Java.
+#include <iostream>
+#include <queue>
+#include <thread>
+#include <mutex>
+#include <condition_variable>
+#include <functional>
+#include <memory>
+
+//future (заглушка для результата)
+
+template<typename T>
+class Future {
+private:
+    T result;
+    bool ready;
+    std::mutex mtx;
+    std::condition_variable cv;
+    
+public:
+    Future() : ready(false) {}
+    
+    void setResult(const T& value) {
+        std::lock_guard<std::mutex> lock(mtx);
+        result = value;
+        ready = true;
+        cv.notify_all();
+    }
+    
+    T get() {
+        std::unique_lock<std::mutex> lock(mtx);
+        cv.wait(lock, [this] { return ready; });
+        return result;
+    }
+};
+
+//активный объект
+
+class AsyncCalculator {
+private:
+    // базовый класс для задачи (command)
+    class TaskBase {
+    public:
+        virtual ~TaskBase() = default;
+        virtual void execute() = 0;
+    };
+    
+    // шаблонная задача с конкретным future
+    template<typename T>
+    class Task : public TaskBase {
+    private:
+        std::function<T()> func;
+        std::shared_ptr<Future<T>> future;
+        
+    public:
+        Task(std::function<T()> f, std::shared_ptr<Future<T>> fut)
+            : func(f), future(fut) {}
+        
+        void execute() override {
+            T result = func();
+            future->setResult(result);
+        }
+    };
+    
+    // очередь задач (fifo)
+    std::queue<std::unique_ptr<TaskBase>> taskQueue;
+    
+    // синхронизация
+    std::mutex queueMutex;
+    std::condition_variable cv;
+    
+    // рабочий поток
+    std::thread workerThread;
+    bool running;
+    
+public:
+    AsyncCalculator() : running(true) {
+        workerThread = std::thread(&AsyncCalculator::processTasks, this);
+    }
+    
+    ~AsyncCalculator() {
+        shutdown();
+        if (workerThread.joinable()) {
+            workerThread.join();
+        }
+    }
+    
+    // отправка задачи на сложение
+    std::shared_ptr<Future<int>> submitAdd(int a, int b) {
+        auto future = std::make_shared<Future<int>>();
+        auto task = std::make_unique<Task<int>>(
+            [a, b]() { return a + b; },
+            future
+        );
+        addTask(std::move(task));
+        return future;
+    }
+    
+    // отправка задачи на умножение
+    std::shared_ptr<Future<int>> submitMultiply(int a, int b) {
+        auto future = std::make_shared<Future<int>>();
+        auto task = std::make_unique<Task<int>>(
+            [a, b]() { return a * b; },
+            future
+        );
+        addTask(std::move(task));
+        return future;
+    }
+    
+    // отправка задачи на вычисление числа фибоначчи
+    std::shared_ptr<Future<long long>> submitFibonacci(int n) {
+        auto future = std::make_shared<Future<long long>>();
+        auto task = std::make_unique<Task<long long>>(
+            [n]() {
+                if (n <= 0) return 0LL;
+                if (n == 1) return 1LL;
+                long long a = 0, b = 1;
+                for (int i = 2; i <= n; ++i) {
+                    long long next = a + b;
+                    a = b;
+                    b = next;
+                }
+                return b;
+            },
+            future
+        );
+        addTask(std::move(task));
+        return future;
+    }
+    
+    // остановка рабочего потока
+    void shutdown() {
+        {
+            std::lock_guard<std::mutex> lock(queueMutex);
+            running = false;
+        }
+        cv.notify_all();
+        if (workerThread.joinable()) {
+            workerThread.join();
+        }
+    }
+    
+private:
+    void addTask(std::unique_ptr<TaskBase> task) {
+        {
+            std::lock_guard<std::mutex> lock(queueMutex);
+            taskQueue.push(std::move(task));
+        }
+        cv.notify_one();
+    }
+    
+    void processTasks() {
+        while (true) {
+            std::unique_ptr<TaskBase> task;
+            {
+                std::unique_lock<std::mutex> lock(queueMutex);
+                cv.wait(lock, [this] {
+                    return !taskQueue.empty() || !running;
+                });
+                if (!running && taskQueue.empty()) {
+                    break;
+                }
+                if (!taskQueue.empty()) {
+                    task = std::move(taskQueue.front());
+                    taskQueue.pop();
+                }
+            }
+            if (task) {
+                task->execute();
+            }
+        }
+    }
+};
+
+int main() {
+    AsyncCalculator calc;
+    
+    std::cout << "submit: add(3,4), multiply(5,6), fib(10), add(100,200), multiply(7,8)" << std::endl;
+    std::cout << "все запросы приняты мгновенно (неблокирующие)" << std::endl << std::endl;
+    
+    // отправляем запросы без ожидания
+    auto future1 = calc.submitAdd(3, 4);
+    auto future2 = calc.submitMultiply(5, 6);
+    auto future3 = calc.submitFibonacci(10);
+    auto future4 = calc.submitAdd(100, 200);
+    auto future5 = calc.submitMultiply(7, 8);
+    
+    // получаем результаты (блокирующий get)
+    std::cout << "future1.get() -> " << future1->get() << " (возможно, уже готово)" << std::endl;
+    std::cout << "future2.get() -> " << future2->get() << std::endl;
+    std::cout << "future3.get() -> " << future3->get() << std::endl;
+    std::cout << "future4.get() -> " << future4->get() << std::endl;
+    std::cout << "future5.get() -> " << future5->get() << std::endl;
+    
+    calc.shutdown();
+    
+    std::cout << std::endl;
+    std::cout << "q31. чем future/promise отличается от синхронного вызова?" << std::endl;
+    std::cout << "ответ:" << std::endl;
+    std::cout << "  синхронный вызов блокирует поток до завершения операции." << std::endl;
+    std::cout << "  future/promise возвращает заглушку (future) сразу," << std::endl;
+    std::cout << "  а реальный результат получается позже через get()." << std::endl;
+    std::cout << "  это позволяет не ждать результат сразу и заниматься другой работой." << std::endl;
+    
+    std::cout << std::endl;
+    std::cout << "q32. как active object сочетает ооп с асинхронностью?" << std::endl;
+    std::cout << "ответ:" << std::endl;
+    std::cout << "  active object инкапсулирует внутри себя:" << std::endl;
+    std::cout << "    - очередь задач (fifo)" << std::endl;
+    std::cout << "    - рабочий поток" << std::endl;
+    std::cout << "    - механизм future для получения результатов" << std::endl;
+    std::cout << "  клиент вызывает методы как обычный ооп-интерфейс," << std::endl;
+    std::cout << "  но выполнение происходит асинхронно в отдельном потоке." << std::endl;
+    std::cout << "  это скрывает сложность многопоточности за простым api." << std::endl;
+    
+    return 0;
+}
