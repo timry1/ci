@@ -1,0 +1,255 @@
+# Рыбалко Тимофей Нбибд01-24 17.05.26  17:15
+# B9:Задача: Реализация принципов Interface Segregation (ISP) и Dependency Inversion (DIP)
+from abc import ABC, abstractmethod
+from typing import List, Dict, Any
+
+
+# часть 1: isp (interface segregation principle)
+
+class WorkerInterface(ABC):
+    """толстый интерфейс — антипример"""
+    
+    @abstractmethod
+    def work(self) -> str:
+        pass
+    
+    @abstractmethod
+    def eat(self) -> str:
+        pass
+    
+    @abstractmethod
+    def sleep(self) -> str:
+        pass
+
+
+class BadRobot(WorkerInterface):
+    """робот вынужден реализовывать ненужные методы — нарушение isp"""
+    
+    def work(self) -> str:
+        return "робот работает..."
+    
+    def eat(self) -> str:
+        raise NotImplementedError("роботы не едят")
+    
+    def sleep(self) -> str:
+        raise NotImplementedError("роботы не спят")
+
+
+# правильное решение: разделяем интерфейсы
+class Workable(ABC):
+    """только работа"""
+    
+    @abstractmethod
+    def work(self) -> str:
+        pass
+
+
+class Eatable(ABC):
+    """только еда"""
+    
+    @abstractmethod
+    def eat(self) -> str:
+        pass
+
+
+class Sleepable(ABC):
+    """только сон"""
+    
+    @abstractmethod
+    def sleep(self) -> str:
+        pass
+
+
+class Robot(Workable):
+    """робот реализует только workable — нет лишних методов"""
+    
+    def work(self) -> str:
+        return "робот: работаю без перерыва"
+
+
+class Human(Workable, Eatable, Sleepable):
+    """человек реализует все интерфейсы"""
+    
+    def work(self) -> str:
+        return "человек: работаю над задачей"
+    
+    def eat(self) -> str:
+        return "человек: обедаю"
+    
+    def sleep(self) -> str:
+        return "человек: сплю 8 часов"
+
+
+# часть 2: dip (dependency inversion principle)
+
+class Database(ABC):
+    """абстракция базы данных"""
+    
+    @abstractmethod
+    def fetch_data(self) -> List[Dict[str, Any]]:
+        pass
+    
+    @abstractmethod
+    def get_name(self) -> str:
+        pass
+
+
+class PostgreSQLDatabase(Database):
+    """реализация postgresql"""
+    
+    def fetch_data(self) -> List[Dict[str, Any]]:
+        return [
+            {"id": 1, "amount": 100, "product": "ноутбук"},
+            {"id": 2, "amount": 50, "product": "мышь"},
+        ]
+    
+    def get_name(self) -> str:
+        return "postgresql"
+
+
+class InMemoryDatabase(Database):
+    """реализация inmemory"""
+    
+    def fetch_data(self) -> List[Dict[str, Any]]:
+        return [
+            {"id": 1, "amount": 200, "product": "телефон"},
+            {"id": 2, "amount": 75, "product": "наушники"},
+            {"id": 3, "amount": 30, "product": "чехол"},
+        ]
+    
+    def get_name(self) -> str:
+        return "inmemory"
+
+
+class ReportService:
+    """сервис зависит от абстракции database, а не от конкретной реализации"""
+    
+    def __init__(self, database: Database):
+        self._database = database
+    
+    def generate(self, period: str = "q1") -> str:
+        data = self._database.fetch_data()
+        db_name = self._database.get_name()
+        records_count = len(data)
+        total_amount = sum(item.get("amount", 0) for item in data)
+        return f"{db_name}: отчёт за {period} ({records_count} записей, сумма: {total_amount})"
+
+
+# демонстрация
+
+print("задача: isp + dip")
+print()
+
+print("1. принцип разделения интерфейсов (isp)")
+print()
+
+robot = Robot()
+print(f"робот: {robot.work()}")
+
+human = Human()
+print(f"человек: {human.work()}")
+print(f"человек: {human.eat()}")
+print(f"человек: {human.sleep()}")
+
+print()
+print("isp соблюдён: robot не содержит методов eat() и sleep()")
+print()
+
+print("2. принцип инверсии зависимостей (dip)")
+print()
+
+print("антипример (жёсткая зависимость):")
+print("""
+class BadReportService:
+    def __init__(self):
+        self.db = PostgreSQLDatabase()  # жёсткая привязка к конкретной бд
+""")
+
+print()
+print("правильный подход (инъекция зависимости через конструктор):")
+print("""
+class ReportService:
+    def __init__(self, database: Database):
+        self._database = database
+""")
+
+print()
+print("демонстрация замены бд")
+print()
+
+postgres_db = PostgreSQLDatabase()
+memory_db = InMemoryDatabase()
+
+report_pg = ReportService(postgres_db)
+print(f"reportservice(postgresqldatabase()): {report_pg.generate('q1')}")
+
+report_memory = ReportService(memory_db)
+print(f"reportservice(inmemorydatabase()): {report_memory.generate('q1')}")
+
+print()
+print("dip соблюдён: reportservice не изменился при смене бд")
+print()
+
+print("ответы на вопросы")
+print()
+
+print("1. как duck typing в python меняет подход к isp по сравнению с java?")
+print()
+print("""в java интерфейсы строгие. класс должен явно объявить implements interface.
+если интерфейс содержит метод, класс обязан его реализовать.
+нарушение isp в java приводит к пустым методам или unsupportedoperationexception.
+
+в python действует утиная типизация (duck typing) — 'если объект крякает как утка,
+значит это утка'. класс не обязан объявлять, какие интерфейсы он реализует.
+если объект имеет метод work() — его можно вызвать. нет методов eat() и sleep() —
+их просто не вызывают.
+
+влияние на isp:
+- java: нужно явно разбивать интерфейсы (workable, eatable, sleepable)
+- python: можно использовать протоколы или просто полагаться на наличие методов.
+  класс robot может вообще не наследовать workable, достаточно иметь метод work()""")
+
+print()
+print("2. что такое dip? чем отличается от простого использования аргументов функции?")
+print()
+print("""dip (dependency inversion principle) — принцип инверсии зависимостей:
+модули верхнего уровня не должны зависеть от модулей нижнего уровня.
+оба должны зависеть от абстракций.
+
+простыми словами:
+- плохо: reportservice создаёт postgresqldatabase() внутри себя
+  (жёсткая зависимость от конкретной бд)
+- хорошо: reportservice получает database извне (через конструктор)
+  и работает с абстракцией, а не с конкретной бд
+
+отличие от простого использования аргументов функции:
+аргументы функции — это просто передача данных.
+dip — архитектурный принцип, который требует:
+1. наличие абстракции (интерфейса/протокола)
+2. зависимость направлена на абстракцию, а не на конкретную реализацию
+3. возможность замены реализации без изменения кода
+
+пример различия:
+def calculate(data_list):           # аргументы — просто данные
+    ...
+
+class ReportService:                # dip — архитектурное решение
+    def __init__(self, db: Database):  # зависимость через абстракцию
+        self.db = db""")
+
+print()
+print("итог")
+print()
+
+print("""isp: интерфейс workerinterface разбит на workable, eatable, sleepable.
+robot реализует только workable. human реализует все три.
+
+dip: reportservice зависит от database (абстракция), а не от конкретной бд.
+замена postgresql на inmemory происходит без изменения reportservice,
+достаточно передать другой объект в конструктор.
+
+duck typing в python: классы не обязаны объявлять интерфейсы,
+достаточно иметь нужные методы.
+
+dip не равно просто аргументы: dip требует абстракции и обеспечивает
+замену целых подсистем без изменения кода.""")
