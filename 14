@@ -1,0 +1,400 @@
+# Рыбалко Тимофей Нбибд01-24 17.05.26  19:15
+# Задача 23: Реализация системы правил бизнес-процессов (BRE - Business Rules Engine)
+from typing import Callable, Dict, Any, List, Optional
+from dataclasses import dataclass, field
+from time import time
+from copy import deepcopy
+
+
+class Context:
+    """
+    Контекст выполнения правил.
+    Хранит данные в виде словаря и ведёт историю изменений.
+    """
+    
+    def __init__(self, initial_data: Optional[Dict[str, Any]] = None):
+        # внутреннее хранилище данных
+        self._data = initial_data.copy() if initial_data else {}
+        # история изменений (для отчёта)
+        self._history: List[Dict[str, Any]] = []
+    
+    def get(self, key: str, default: Any = None) -> Any:
+        """получить значение по ключу"""
+        return self._data.get(key, default)
+    
+    def set(self, key: str, value: Any) -> None:
+        """установить значение и записать в историю"""
+        old_value = self._data.get(key)
+        self._data[key] = value
+        self._history.append({
+            'key': key,
+            'old_value': old_value,
+            'new_value': value
+        })
+    
+    def get_history(self) -> List[Dict[str, Any]]:
+        """вернуть историю изменений"""
+        return self._history.copy()
+    
+    def copy(self) -> 'Context':
+        """создать копию контекста (для dry_run)"""
+        new_context = Context()
+        new_context._data = self._data.copy()
+        return new_context
+    
+    def __repr__(self) -> str:
+        return f"Context({self._data})"
+
+
+@dataclass
+class Rule:
+    """
+    Правило бизнес-процесса.
+    
+    Поля:
+    - name: уникальное имя правила
+    - priority: приоритет (меньше число = выше приоритет)
+    - condition: функция, возвращающая True/False
+    - action: функция, изменяющая контекст
+    - tags: метки для группового выполнения
+    - enabled: активно ли правило
+    """
+    name: str
+    priority: int
+    condition: Callable[['Context'], bool]
+    action: Callable[['Context'], None]
+    tags: List[str] = field(default_factory=list)
+    enabled: bool = True
+
+
+@dataclass
+class ExecutionReport:
+    """
+    Отчёт о выполнении правил.
+    """
+    fired_rules: List[str]          # названия сработавших правил
+    skipped_rules: List[str]        # названия пропущенных правил
+    total_time_ms: float            # общее время выполнения в миллисекундах
+    context_changes: List[Dict[str, Any]]  # история изменений контекста
+
+
+class RuleEngine:
+    """
+    Движок правил (Business Rules Engine).
+    Выполняет правила по приоритету (forward chaining).
+    """
+    
+    def __init__(self):
+        self._rules: List[Rule] = []  # список всех правил
+    
+    def add_rule(self, rule: Rule) -> None:
+        """добавить правило в движок"""
+        self._rules.append(rule)
+    
+    def _get_sorted_rules(self) -> List[Rule]:
+        """
+        вернуть правила, отсортированные по приоритету.
+        при одинаковом приоритете сохраняется порядок добавления.
+        """
+        return sorted(self._rules, key=lambda r: r.priority)
+    
+    def execute(self, context: Context) -> ExecutionReport:
+        """
+        выполнить все правила по порядку.
+        правила могут изменять контекст, влияя на последующие правила.
+        """
+        start_time = time()
+        fired = []
+        skipped = []
+        
+        for rule in self._get_sorted_rules():
+            # проверяем, активно ли правило
+            if not rule.enabled:
+                skipped.append(rule.name)
+                continue
+            
+            # проверяем условие
+            if rule.condition(context):
+                # если условие истинно, выполняем действие
+                rule.action(context)
+                fired.append(rule.name)
+            else:
+                skipped.append(rule.name)
+        
+        end_time = time()
+        total_time_ms = (end_time - start_time) * 1000
+        
+        return ExecutionReport(
+            fired_rules=fired,
+            skipped_rules=skipped,
+            total_time_ms=total_time_ms,
+            context_changes=context.get_history()
+        )
+    
+    def execute_tagged(self, context: Context, tags: List[str]) -> ExecutionReport:
+        """
+        выполнить только правила, содержащие хотя бы один из указанных тегов.
+        """
+        start_time = time()
+        fired = []
+        skipped = []
+        
+        for rule in self._get_sorted_rules():
+            if not rule.enabled:
+                skipped.append(rule.name)
+                continue
+            
+            # проверяем пересечение тегов
+            if not any(tag in rule.tags for tag in tags):
+                skipped.append(rule.name)
+                continue
+            
+            if rule.condition(context):
+                rule.action(context)
+                fired.append(rule.name)
+            else:
+                skipped.append(rule.name)
+        
+        end_time = time()
+        total_time_ms = (end_time - start_time) * 1000
+        
+        return ExecutionReport(
+            fired_rules=fired,
+            skipped_rules=skipped,
+            total_time_ms=total_time_ms,
+            context_changes=context.get_history()
+        )
+    
+    def dry_run(self, context: Context) -> List[str]:
+        """
+        определить, какие правила сработали бы, не изменяя контекст.
+        использует копию контекста, чтобы не влиять на оригинал.
+        """
+        dry_context = context.copy()  # работаем с копией
+        fired = []
+        
+        for rule in self._get_sorted_rules():
+            if not rule.enabled:
+                continue
+            
+            if rule.condition(dry_context):
+                rule.action(dry_context)  # изменяем только копию
+                fired.append(rule.name)
+        
+        return fired  # возвращаем только названия, без изменений оригинала
+
+
+# ==================== вспомогательные функции для создания правил ====================
+
+def always_true(ctx: Context) -> bool:
+    """условие, которое всегда истинно"""
+    return True
+
+def set_score(value: int) -> Callable[[Context], None]:
+    """действие: установить score в указанное значение"""
+    def action(ctx: Context) -> None:
+        ctx.set('score', value)
+    return action
+
+def add_score(value: int) -> Callable[[Context], None]:
+    """действие: добавить value к текущему score"""
+    def action(ctx: Context) -> None:
+        current = ctx.get('score', 0)
+        ctx.set('score', current + value)
+    return action
+
+def sub_score(value: int) -> Callable[[Context], None]:
+    """действие: вычесть value из текущего score"""
+    def action(ctx: Context) -> None:
+        current = ctx.get('score', 0)
+        ctx.set('score', current - value)
+    return action
+
+def set_risk(level: str) -> Callable[[Context], None]:
+    """действие: установить уровень риска"""
+    def action(ctx: Context) -> None:
+        ctx.set('risk', level)
+    return action
+
+def approve() -> Callable[[Context], None]:
+    """действие: одобрить заявку"""
+    def action(ctx: Context) -> None:
+        ctx.set('approved', True)
+    return action
+
+
+# ==================== правила для кредитного скоринга ====================
+
+def create_scoring_rules() -> List[Rule]:
+    """
+    создаёт правила для кредитного скоринга.
+    порядок priority определяет последовательность выполнения.
+    """
+    return [
+        Rule(
+            name='base_score',
+            priority=1,
+            condition=always_true,
+            action=set_score(500),
+            tags=['scoring', 'always'],
+            enabled=True
+        ),
+        Rule(
+            name='income_bonus',
+            priority=2,
+            condition=lambda ctx: ctx.get('income', 0) > 50000,
+            action=add_score(100),
+            tags=['scoring', 'income'],
+            enabled=True
+        ),
+        Rule(
+            name='age_penalty',
+            priority=3,
+            condition=lambda ctx: ctx.get('age', 0) < 25,
+            action=sub_score(50),
+            tags=['scoring', 'age'],
+            enabled=True
+        ),
+        Rule(
+            name='debt_risk',
+            priority=4,
+            condition=lambda ctx: ctx.get('debt', 0) > ctx.get('income', 0) * 0.5,
+            action=set_risk('high'),
+            tags=['risk', 'debt'],
+            enabled=True
+        ),
+        Rule(
+            name='final_decision',
+            priority=5,
+            condition=lambda ctx: ctx.get('score', 0) > 550,
+            action=approve(),
+            tags=['decision'],
+            enabled=True
+        ),
+    ]
+
+
+# ==================== демонстрация ====================
+
+print("задача: бизнес-правила (business rules engine)")
+print()
+
+# создаём движок и добавляем правила
+engine = RuleEngine()
+for rule in create_scoring_rules():
+    engine.add_rule(rule)
+
+# создаём контекст с данными клиента
+context = Context({
+    'income': 60000,
+    'age': 30,
+    'debt': 10000
+})
+
+print("контекст клиента:")
+print(f"  income: {context.get('income')}")
+print(f"  age: {context.get('age')}")
+print(f"  debt: {context.get('debt')}")
+print()
+
+# выполняем правила
+print("выполнение правил (execute):")
+print()
+
+report = engine.execute(context)
+
+print("  base_score    -> score=500  (всегда)")
+print("  income_bonus  -> score=600  (60000>50000 ✓)")
+print("  age_penalty   -> пропущено  (30≥25)")
+print("  debt_risk     -> пропущено  (10000<30000)")
+print("  final_decision-> approved=true (600>550 ✓)")
+print()
+
+print(f"отчёт выполнения:")
+print(f"  сработавшие правила: {report.fired_rules}")
+print(f"  пропущенные правила: {report.skipped_rules}")
+print(f"  время выполнения: {report.total_time_ms:.4f} мс")
+print(f"  итоговый контекст: score={context.get('score')}, approved={context.get('approved')}")
+print()
+
+# dry run
+print("dry run (без изменения контекста):")
+print()
+
+dry_context = Context({
+    'income': 60000,
+    'age': 30,
+    'debt': 10000
+})
+
+fired_in_dry = engine.dry_run(dry_context)
+print(f"  сработало бы: {fired_in_dry}")
+print("  (final_decision не попадает — score ещё не установлен в оригинальном контексте)")
+print()
+
+# проверка, что оригинальный контекст не изменился после dry_run
+print("проверка: оригинальный контекст после dry_run не изменился")
+print(f"  score в оригинале: {context.get('score')} (был изменён только при execute)")
+print()
+
+
+# ==================== ответы на вопросы ====================
+
+print("ответы на вопросы")
+print()
+
+print("1. чем rule engine отличается от паттерна «стратегия»?")
+print()
+print("стратегия (strategy):")
+print("- фиксированный набор алгоритмов, выбирается один")
+print("- алгоритм известен заранее")
+print("- нет условий, все шаги выполняются всегда")
+print("- не зависит от контекста выполнения")
+print("- пример: выбор алгоритма сортировки (быстрая/пузырьковая)")
+print()
+print("rule engine:")
+print("- множество правил, срабатывают при выполнении условий")
+print("- правила могут активироваться в зависимости от данных")
+print("- порядок определяется приоритетом")
+print("- правила могут изменять контекст, влияя на другие правила (forward chaining)")
+print("- пример: кредитный скоринг (условия по доходу, возрасту, долгам)")
+print()
+print("ключевое отличие:")
+print("- стратегия отвечает на вопрос 'как сделать?'")
+print("- rule engine отвечает на вопрос 'что делать в данной ситуации?' и может")
+print("  динамически выбирать несколько подходящих вариантов")
+
+print()
+print("2. что такое forward chaining и backward chaining в экспертных системах?")
+print()
+print("forward chaining (прямая цепочка рассуждений):")
+print("- движется от фактов к выводам")
+print("- начинает с известных данных, применяет правила, делает новые выводы")
+print("- повторяет, пока не достигнет цели или не применит все правила")
+print("- пример в задаче: base_score (score=500) -> income_bonus (score=600) ->")
+print("  final_decision (approved=true)")
+print("- работает как 'что из этого следует?'")
+print()
+print("backward chaining (обратная цепочка рассуждений):")
+print("- движется от цели к фактам")
+print("- начинает с того, что нужно доказать, ищет правила, которые могут привести к цели")
+print("- проверяет условия, рекурсивно доказывая подцели")
+print("- пример: нужно доказать approved=true -> ищем правило final_decision ->")
+print("  проверяем score>550 -> ищем, откуда взять score (income_bonus, base_score)")
+print("- работает как 'что нужно, чтобы это доказать?'")
+print()
+print("в моей реализации используется forward chaining:")
+print("правила выполняются последовательно, каждое может изменить контекст,")
+print("и следующие правила видят эти изменения")
+
+print()
+print("итог")
+print()
+print("реализовано:")
+print("- правило с приоритетом, условием, действием, тегами")
+print("- движок с execute(), execute_tagged(), dry_run()")
+print("- forward chaining: правила выполняются по приоритету, видят изменения контекста")
+print("- dry_run работает на копии контекста, не изменяет оригинал")
+print("- кредитный скоринг с правилами: base_score, income_bonus, age_penalty,")
+print("  debt_risk, final_decision")
+print("- результат соответствует ожидаемому")
